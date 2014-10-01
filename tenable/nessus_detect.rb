@@ -22,7 +22,8 @@ class Metasploit3 < Msf::Auxiliary
     register_options(
       [
         Opt::RPORT(8834),
-        OptInt.new('THREADS', [true, "The number of concurrent threads", 16])
+        OptInt.new('THREADS', [true, "The number of concurrent threads", 16]),
+        OptString.new('URI', [true, "URI for Nessus properties", "/feed"])
       ], self.class)
 
     register_advanced_options(
@@ -34,6 +35,7 @@ class Metasploit3 < Msf::Auxiliary
   def run_host(ip)
     begin
       res = send_request_cgi!({
+        'uri'     => datastore['URI'],
         'method'  => 'GET'
         }, 15)
       rescue ::Rex::ConnectionError, Errno::ECONNREFUSED, Errno::ETIMEDOUT
@@ -43,14 +45,28 @@ class Metasploit3 < Msf::Auxiliary
 
       if res
         if res.headers['Server'] =~ /Nessus/
-          print_good("#{ip} - Nessus Detected")
-          report_service(
-            :host => ip,
-            :port => datastore['RPORT'],
-            :name => "nessus",
-            :info => 'Nessus Detected',
-            :state => 'open'
-          )
+          if match = res.body.match(/^<server_version>(\d+\.\d+\.\d+)/)
+            version = match.captures
+            print_good("#{ip} - Nessus #{version[0]} Detected")
+            report_service(
+              :host => ip,
+              :port => datastore['RPORT'],
+              :name => "nessus",
+              :version => "#{version[0]}",
+              :info => "Nessus #{version[0]} Detected",
+              :state => "open"
+            )
+          else
+            print_good("#{ip} - Nessus Detected")
+            report_service(
+              :host => ip,
+              :port => datastore['RPORT'],
+              :name => "nessus",
+              :info => "Nessus Detected",
+              :state => "open"
+            )
+
+        end
         else
           print_error("#{ip} - Server is not Nessus (header: #{res.headers['Server'] || ''})")
         end
