@@ -22,7 +22,8 @@ class Metasploit3 < Msf::Auxiliary
     register_options(
       [
         Opt::RPORT(443),
-        OptInt.new('THREADS', [true, "The number of concurrent threads", 16])
+        OptInt.new('THREADS', [true, "The number of concurrent threads", 16]),
+        OptString.new('URI', [true, "URI for PVS properties", "/request.php"])
       ], self.class)
 
     register_advanced_options(
@@ -35,7 +36,11 @@ class Metasploit3 < Msf::Auxiliary
   def run_host(ip)
     begin
       res = send_request_cgi!({
-        'method'  => 'GET'
+        'method'  => 'POST',
+        'uri'     => datastore['URI'],
+        'vars_post' => {"request id" => "1",
+                        "module" => "system",
+                        "action" => "init"}
         }, 15)
       rescue ::Rex::ConnectionError, Errno::ECONNREFUSED, Errno::ETIMEDOUT
         print_error("#{ip} - HTTP Connection Failed!")
@@ -43,13 +48,16 @@ class Metasploit3 < Msf::Auxiliary
       end
 
       if res
-        if res.body =~ /\<title\>Tenable/ and res.body =~ /js\/tenable.js\?version/
-          print_good("#{ip} - SecurityCenter Detected")
+        if match = res.body.match(/\"version\":\"(\d+\.\d+\.\d+)\"/)
+          version = match.captures
+          print_good("#{ip} - SecurityCenter #{version[0]} Detected")
+
           report_service(
             :host => ip,
             :port => datastore['RPORT'],
             :name => "sc",
-            :info => 'Tenable SecurityCenter Detected',
+            :version => "#{version[0]}",
+            :info => 'Tenable SecurityCenter #{version[0]} Detected',
             :state => 'open'
           )
         else
