@@ -28,7 +28,8 @@ class Metasploit3 < Msf::Auxiliary
 
     register_advanced_options(
       [
-        OptBool.new('SSL', [ true, "Negotiate SSL connections", true])
+        OptBool.new('SSL', [ true, "Negotiate SSL connections", true]),
+        OptEnum.new('SSLVersion', [ false, 'Specify the version of SSL that should be used', 'TLS1', ['SSL2', 'SSL3', 'TLS1']])
       ], self.class)
   end
 
